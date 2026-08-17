@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0B1220">
+<meta name="description" content="Entregas de turno estructuradas I-PASS/SBAR para urgencias y UCI, offline-first.">
+<title>Entrega de Turno · I-PASS</title>
+
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="icon" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Entrega Turno">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- ===================== HEADER ===================== -->
+<header class="topbar">
+  <div class="topbar-brand">
+    <span class="pulse-dot" aria-hidden="true"></span>
+    <div>
+      <h1>Entrega de Turno</h1>
+      <p class="topbar-sub" id="shiftMeta">Sin pacientes aún</p>
+    </div>
+  </div>
+  <div class="topbar-actions">
+    <button class="icon-btn" id="btnCopyAll" title="Copiar reporte completo del turno" aria-label="Copiar reporte completo">
+      <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M16 1H4a2 2 0 0 0-2 2v14h2V3h12V1zm3 4H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2zm0 16H8V7h11v14z"/></svg>
+    </button>
+    <button class="icon-btn" id="btnTheme" title="Cambiar tema" aria-label="Cambiar tema">
+      <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M12 3a9 9 0 1 0 9 9c0-.46-.04-.92-.1-1.36a5.389 5.389 0 0 1-4.4 2.26 5.403 5.403 0 0 1-3.14-9.8c-.44-.06-.9-.1-1.36-.1z"/></svg>
+    </button>
+  </div>
+</header>
+
+<!-- ===================== LISTA DE PACIENTES ===================== -->
+<main id="listView" class="view">
+  <div class="filter-row" role="tablist" aria-label="Filtrar por gravedad">
+    <button class="chip chip-all active" data-filter="all" role="tab" aria-selected="true">Todos <span id="countAll">0</span></button>
+    <button class="chip chip-green" data-filter="green" role="tab" aria-selected="false"><span class="dot dot-green"></span> Estable <span id="countGreen">0</span></button>
+    <button class="chip chip-yellow" data-filter="yellow" role="tab" aria-selected="false"><span class="dot dot-yellow"></span> Watcher <span id="countYellow">0</span></button>
+    <button class="chip chip-red" data-filter="red" role="tab" aria-selected="false"><span class="dot dot-red"></span> Inestable <span id="countRed">0</span></button>
+  </div>
+
+  <div id="patientList" class="patient-list"></div>
+
+  <div id="emptyState" class="empty-state" hidden>
+    <svg viewBox="0 0 24 24" width="40" height="40"><path fill="currentColor" d="M12 2a5 5 0 1 1 0 10 5 5 0 0 1 0-10zm0 12c4.42 0 8 1.79 8 4v2H4v-2c0-2.21 3.58-4 8-4z" opacity=".5"/></svg>
+    <p>No hay pacientes registrados</p>
+    <span>Toca "Nuevo paciente" para iniciar la entrega de turno</span>
+  </div>
+</main>
+
+<button id="btnNew" class="fab" aria-label="Nuevo paciente">
+  <svg viewBox="0 0 24 24" width="26" height="26"><path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6z"/></svg>
+  <span>Nuevo paciente</span>
+</button>
+
+<!-- ===================== FORMULARIO PACIENTE ===================== -->
+<section id="formView" class="view form-view" hidden>
+  <header class="form-header">
+    <button class="icon-btn" id="btnBack" aria-label="Volver">
+      <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20z"/></svg>
+    </button>
+    <h2 id="formTitle">Nuevo paciente</h2>
+    <button class="icon-btn danger" id="btnDelete" aria-label="Eliminar paciente" hidden>
+      <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M6 19a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+    </button>
+  </header>
+
+  <!-- steps -->
+  <nav class="steps" role="tablist" aria-label="Secciones del formulario">
+    <button class="step-btn active" data-step="1" role="tab" aria-selected="true">1<span>Identificación</span></button>
+    <button class="step-btn" data-step="2" role="tab" aria-selected="false">2<span>Estado</span></button>
+    <button class="step-btn" data-step="3" role="tab" aria-selected="false">3<span>Acciones</span></button>
+    <button class="step-btn" data-step="4" role="tab" aria-selected="false">4<span>Contingencia</span></button>
+  </nav>
+
+  <form id="patientForm" class="form-body" autocomplete="off">
+
+    <!-- STEP 1 -->
+    <fieldset class="step-panel active" data-panel="1">
+      <legend class="sr-only">Identificación</legend>
+
+      <div class="field-row">
+        <div class="field">
+          <label for="fBed">Cama</label>
+          <input type="text" id="fBed" placeholder="Ej. UCI-04" inputmode="text" required>
+        </div>
+        <div class="field field-sm">
+          <label for="fAge">Edad</label>
+          <input type="number" id="fAge" placeholder="Años" min="0" max="130" inputmode="numeric">
+        </div>
+        <div class="field field-sm">
+          <label for="fSex">Sexo</label>
+          <select id="fSex">
+            <option value="">--</option>
+            <option value="F">F</option>
+            <option value="M">M</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="fDx">Diagnóstico principal</label>
+        <textarea id="fDx" rows="2" placeholder="Ej. Choque séptico de origen abdominal"></textarea>
+      </div>
+
+      <div class="field">
+        <label>Gravedad</label>
+        <div class="severity-select" id="severitySelect">
+          <button type="button" class="sev-btn sev-green" data-sev="green">
+            <span class="sev-dot"></span>
+            <strong>Estable</strong>
+            <small>Verde</small>
+          </button>
+          <button type="button" class="sev-btn sev-yellow" data-sev="yellow">
+            <span class="sev-dot"></span>
+            <strong>Watcher</strong>
+            <small>Amarillo</small>
+          </button>
+          <button type="button" class="sev-btn sev-red" data-sev="red">
+            <span class="sev-dot"></span>
+            <strong>Inestable</strong>
+            <small>Rojo</small>
+          </button>
+        </div>
+      </div>
+    </fieldset>
+
+    <!-- STEP 2 -->
+    <fieldset class="step-panel" data-panel="2">
+      <legend class="sr-only">Estado y soportes</legend>
+
+      <div class="field">
+        <label for="fVitals">Signos vitales / PAM</label>
+        <input type="text" id="fVitals" placeholder="Ej. PA 90/60 · PAM 68 · FC 112 · SatO2 94%" class="mono-input">
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label for="fRespType">Soporte respiratorio</label>
+          <select id="fRespType">
+            <option value="">-- Selecciona --</option>
+            <option>Aire ambiente</option>
+            <option>Cánula nasal</option>
+            <option>Máscara de reservorio</option>
+            <option>Alto flujo (AFO)</option>
+            <option>VMNI / BiPAP</option>
+            <option>VM invasiva</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label for="fRespDetail">Detalle respiratorio</label>
+        <input type="text" id="fRespDetail" placeholder="Ej. FiO2 40%, PEEP 6, modo VC" class="mono-input">
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label for="fHemoType">Soporte hemodinámico</label>
+          <select id="fHemoType">
+            <option value="">-- Selecciona --</option>
+            <option>Ninguno</option>
+            <option>Cristaloides</option>
+            <option>Norepinefrina</option>
+            <option>Vasopresina</option>
+            <option>Dobutamina</option>
+            <option>Múltiples vasoactivos</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label for="fHemoDetail">Detalle vasoactivo</label>
+        <input type="text" id="fHemoDetail" placeholder="Ej. NA 0.3 mcg/kg/min" class="mono-input">
+      </div>
+
+      <div class="field">
+        <label for="fMeds">Medicación crítica activa</label>
+        <textarea id="fMeds" rows="2" placeholder="Ej. Meropenem, heparina infusión, sedación con fentanilo/midazolam"></textarea>
+      </div>
+    </fieldset>
+
+    <!-- STEP 3 -->
+    <fieldset class="step-panel" data-panel="3">
+      <legend class="sr-only">Lista de acciones</legend>
+      <div class="field">
+        <label>Pendientes / acciones para el próximo turno</label>
+        <div class="action-add-row">
+          <input type="text" id="fActionInput" placeholder="Escribe un pendiente y agrégalo">
+          <button type="button" id="btnAddAction" class="btn-add" aria-label="Agregar pendiente">
+            <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6z"/></svg>
+          </button>
+        </div>
+        <ul id="actionList" class="action-list"></ul>
+        <p class="hint" id="actionHint">Aún no hay pendientes agregados</p>
+      </div>
+    </fieldset>
+
+    <!-- STEP 4 -->
+    <fieldset class="step-panel" data-panel="4">
+      <legend class="sr-only">Contingencia</legend>
+      <div class="field">
+        <label for="fContingency">Plan de contingencia — "Si pasa X → hacer Y"</label>
+        <textarea id="fContingency" rows="6" placeholder="Ej. Si PAS &lt; 80 mmHg pese a bolo de cristaloides → iniciar norepinefrina y avisar a UCI.&#10;Si desaturación &lt; 88% → aumentar FiO2 y considerar IOT."></textarea>
+      </div>
+    </fieldset>
+
+  </form>
+
+  <footer class="form-footer">
+    <button type="button" class="btn-secondary" id="btnPrevStep" hidden>Atrás</button>
+    <button type="button" class="btn-primary" id="btnNextStep">Siguiente</button>
+    <button type="button" class="btn-primary btn-save" id="btnSave" hidden>Guardar paciente</button>
+  </footer>
+</section>
+
+<!-- ===================== VISTA REPORTE ===================== -->
+<section id="reportView" class="view report-view" hidden>
+  <header class="form-header">
+    <button class="icon-btn" id="btnReportBack" aria-label="Volver">
+      <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20z"/></svg>
+    </button>
+    <h2 id="reportTitle">Reporte</h2>
+    <button class="icon-btn" id="btnReportCopy" aria-label="Copiar reporte">
+      <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M16 1H4a2 2 0 0 0-2 2v14h2V3h12V1zm3 4H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2zm0 16H8V7h11v14z"/></svg>
+    </button>
+  </header>
+  <pre id="reportText" class="report-text mono-input"></pre>
+</section>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
