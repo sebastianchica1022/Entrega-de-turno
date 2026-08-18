@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0B1220">
+<meta name="description" content="Entregas de turno estructuradas I-PASS/SBAR para urgencias y UCI, offline-first, con sincronización opcional entre dispositivos.">
+<title>Entrega de Turno · I-PASS</title>
+
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="icon" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Entrega Turno">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="styles.css">
+
+<!-- Firebase (opcional): solo se activa si /firebase-config.js tiene credenciales reales -->
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
+</head>
+<body>
+
+<!-- ===================== HEADER ===================== -->
+<header class="topbar">
+  <div class="topbar-brand">
+    <span class="pulse-dot" id="pulseDot" aria-hidden="true"></span>
+    <div>
+      <h1>Entrega de Turno</h1>
+      <p class="topbar-sub" id="shiftMeta">Sin pacientes aún</p>
+    </div>
+  </div>
+  <div class="topbar-actions">
+    <button class="icon-btn" id="btnPdf" title="Generar PDF resumido" aria-label="Generar PDF resumido">
+      <svg viewBox="0 0 24 24" width="19" height="19"><path fill="currentColor" d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 1.5L18.5 9H13V3.5zM8 13h1.5a1.5 1.5 0 0 1 0 3H8.75v1.5H8V13zm.75 2.25h.75a.75.75 0 0 0 0-1.5h-.75v1.5zM12 13h1.4c.9 0 1.6.7 1.6 1.7v.6c0 1-.7 1.7-1.6 1.7H12v-4zm.75.75v2.5h.65c.5 0 .85-.35.85-.9v-.7c0-.55-.35-.9-.85-.9h-.65zM16 13h2v.75h-1.25v.85H18v.75h-1.25v1.65H16v-4z"/></svg>
+    </button>
+    <button class="icon-btn" id="btnCopyAll" title="Copiar reporte completo del turno" aria-label="Copiar reporte completo">
+      <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M16 1H4a2 2 0 0 0-2 2v14h2V3h12V1zm3 4H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2zm0 16H8V7h11v14z"/></svg>
+    </button>
+    <button class="icon-btn" id="btnTheme" title="Cambiar tema" aria-label="Cambiar tema">
+      <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M12 3a9 9 0 1 0 9 9c0-.46-.04-.92-.1-1.36a5.389 5.389 0 0 1-4.4 2.26 5.403 5.403 0 0 1-3.14-9.8c-.44-.06-.9-.1-1.36-.1z"/></svg>
+    </button>
+  </div>
+</header>
+
+<button class="shift-bar" id="btnShift" aria-haspopup="dialog">
+  <span class="shift-icon" id="shiftIcon">☀️</span>
+  <span class="shift-info">
+    <strong id="shiftDateLabel">Turno</strong>
+    <small id="shiftTypeLabel">--</small>
+  </span>
+  <span class="shift-sync" id="shiftSyncBadge" hidden>☁️ Sincronizado</span>
+  <span class="shift-count" id="shiftPatientCount">0 pacientes</span>
+  <svg class="chevron" viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M7 10l5 5 5-5z"/></svg>
+</button>
+
+<!-- ===================== TAB: PACIENTES ===================== -->
+<main id="listView" class="view main-view">
+  <div class="filter-row" role="tablist" aria-label="Filtrar por gravedad">
+    <button class="chip chip-all active" data-filter="all" role="tab" aria-selected="true">Todos <span id="countAll">0</span></button>
+    <button class="chip chip-green" data-filter="green" role="tab" aria-selected="false"><span class="dot dot-green"></span> Estable <span id="countGreen">0</span></button>
+    <button class="chip chip-yellow" data-filter="yellow" role="tab" aria-selected="false"><span class="dot dot-yellow"></span> Watcher <span id="countYellow">0</span></button>
+    <button class="chip chip-red" data-filter="red" role="tab" aria-selected="false"><span class="dot dot-red"></span> Inestable <span id="countRed">0</span></button>
+  </div>
+
+  <div id="patientList" class="patient-list"></div>
+
+  <div id="emptyState" class="empty-state" hidden>
+    <svg viewBox="0 0 24 24" width="40" height="40"><path fill="currentColor" d="M12 2a5 5 0 1 1 0 10 5 5 0 0 1 0-10zm0 12c4.42 0 8 1.79 8 4v2H4v-2c0-2.21 3.58-4 8-4z" opacity=".5"/></svg>
+    <p>No hay pacientes registrados</p>
+    <span>Toca "Nuevo paciente" para iniciar la entrega de turno</span>
+  </div>
+</main>
+
+<!-- ===================== TAB: PENDIENTES ===================== -->
+<main id="pendientesView" class="view main-view" hidden>
+  <div class="section-intro">
+    <h2>Pendientes del turno</h2>
+    <p>Ordenados por gravedad del paciente. Márcalos al cumplirlos; no se borran de la lista.</p>
+  </div>
+  <div id="pendientesGroups"></div>
+  <div id="pendientesEmpty" class="empty-state" hidden>
+    <svg viewBox="0 0 24 24" width="40" height="40"><path fill="currentColor" d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z" opacity=".5"/></svg>
+    <p>No hay pendientes registrados</p>
+    <span>Los pendientes que agregues a cada paciente aparecerán agrupados aquí</span>
+  </div>
+</main>
+
+<!-- ===================== TAB: ESPECIALIDADES ===================== -->
+<main id="specialtyView" class="view main-view" hidden>
+  <div class="filter-row" id="specialtyTabs" role="tablist" aria-label="Filtrar por especialidad"></div>
+  <div id="specialtyList" class="patient-list"></div>
+  <div id="specialtyEmpty" class="empty-state" hidden>
+    <svg viewBox="0 0 24 24" width="40" height="40"><path fill="currentColor" d="M12 2a5 5 0 1 1 0 10 5 5 0 0 1 0-10zm0 12c4.42 0 8 1.79 8 4v2H4v-2c0-2.21 3.58-4 8-4z" opacity=".5"/></svg>
+    <p>Sin pacientes en esta especialidad</p>
+  </div>
+</main>
+
+<!-- ===================== TAB: TRASLADOS ===================== -->
+<main id="dispositionView" class="view main-view" hidden>
+  <div class="section-intro">
+    <h2>Traslados al finalizar la ronda</h2>
+    <p>Define el destino de cada paciente desde su ficha (paso "Contingencia").</p>
+  </div>
+  <div id="dispositionGroups"></div>
+</main>
+
+<button id="btnNew" class="fab" aria-label="Nuevo paciente">
+  <svg viewBox="0 0 24 24" width="26" height="26"><path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6z"/></svg>
+  <span>Nuevo paciente</span>
+</button>
+
+<!-- ===================== NAV INFERIOR ===================== -->
+<nav class="bottom-nav" id="bottomNav">
+  <button class="bn-btn active" data-tab="listView" aria-label="Pacientes">
+    <svg viewBox="0 0 24 24" width="21" height="21"><path fill="currentColor" d="M12 12c2.7 0 8 1.34 8 4v2H4v-2c0-2.66 5.3-4 8-4zm0-2a4 4 0 1 1 0-8 4 4 0 0 1 0 8z"/></svg>
+    <span>Pacientes</span>
+  </button>
+  <button class="bn-btn" data-tab="pendientesView" aria-label="Pendientes">
+    <svg viewBox="0 0 24 24" width="21" height="21"><path fill="currentColor" d="M19 3h-4.18C14.4 1.84 13.3 1 12 1s-2.4.84-2.82 2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zm-7 0a1 1 0 1 1 0 2 1 1 0 0 1 0-2zm-2 14-3.5-3.5 1.41-1.41L10 14.17l6.09-6.09L17.5 9.5z"/></svg>
+    <span>Pendientes</span>
+    <span class="bn-badge" id="pendientesBadge" hidden>0</span>
+  </button>
+  <button class="bn-btn" data-tab="specialtyView" aria-label="Especialidades">
+    <svg viewBox="0 0 24 24" width="21" height="21"><path fill="currentColor" d="M12 2a1 1 0 0 1 1 1v2h4a1 1 0 0 1 1 1v3h2a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1h2V6a1 1 0 0 1 1-1h4V3a1 1 0 0 1 1-1zm-1 8h-2v2H7v2h2v2h2v-2h2v-2h-2z"/></svg>
+    <span>Especialidad</span>
+  </button>
+  <button class="bn-btn" data-tab="dispositionView" aria-label="Traslados">
+    <svg viewBox="0 0 24 24" width="21" height="21"><path fill="currentColor" d="M20 8h-3V4H3c-1.1 0-2 .9-2 2v11h2a3 3 0 1 0 6 0h6a3 3 0 1 0 6 0h2v-5zM7.5 18.5A1.5 1.5 0 1 1 9 17a1.5 1.5 0 0 1-1.5 1.5zm12 0A1.5 1.5 0 1 1 21 17a1.5 1.5 0 0 1-1.5 1.5zM17 12V9.5h2.5L21 12z"/></svg>
+    <span>Traslados</span>
+  </button>
+</nav>
+
+<!-- ===================== FORMULARIO PACIENTE ===================== -->
+<section id="formView" class="view form-view" hidden>
+  <header class="form-header">
+    <button class="icon-btn" id="btnBack" aria-label="Volver">
+      <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20z"/></svg>
+    </button>
+    <h2 id="formTitle">Nuevo paciente</h2>
+    <button class="icon-btn danger" id="btnDelete" aria-label="Eliminar paciente" hidden>
+      <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M6 19a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+    </button>
+  </header>
+
+  <nav class="steps" role="tablist" aria-label="Secciones del formulario">
+    <button class="step-btn active" data-step="1" role="tab" aria-selected="true">1<span>Identificación</span></button>
+    <button class="step-btn" data-step="2" role="tab" aria-selected="false">2<span>Estado</span></button>
+    <button class="step-btn" data-step="3" role="tab" aria-selected="false">3<span>Acciones</span></button>
+    <button class="step-btn" data-step="4" role="tab" aria-selected="false">4<span>Contingencia</span></button>
+  </nav>
+
+  <form id="patientForm" class="form-body" autocomplete="off">
+
+    <!-- STEP 1 -->
+    <fieldset class="step-panel active" data-panel="1">
+      <legend class="sr-only">Identificación</legend>
+
+      <div class="field-row">
+        <div class="field">
+          <label for="fBed">Cama</label>
+          <input type="text" id="fBed" placeholder="Ej. UCI-04" inputmode="text" required>
+        </div>
+        <div class="field field-sm">
+          <label for="fAge">Edad</label>
+          <input type="number" id="fAge" placeholder="Años" min="0" max="130" inputmode="numeric">
+        </div>
+        <div class="field field-sm">
+          <label for="fSex">Sexo</label>
+          <select id="fSex">
+            <option value="">--</option>
+            <option value="F">F</option>
+            <option value="M">M</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="fDx">Diagnóstico principal</label>
+        <textarea id="fDx" rows="2" placeholder="Ej. Choque séptico de origen abdominal"></textarea>
+      </div>
+
+      <div class="field">
+        <label>Gravedad</label>
+        <div class="severity-select" id="severitySelect">
+          <button type="button" class="sev-btn sev-green" data-sev="green">
+            <span class="sev-dot"></span>
+            <strong>Estable</strong>
+            <small>Verde</small>
+          </button>
+          <button type="button" class="sev-btn sev-yellow" data-sev="yellow">
+            <span class="sev-dot"></span>
+            <strong>Watcher</strong>
+            <small>Amarillo</small>
+          </button>
+          <button type="button" class="sev-btn sev-red" data-sev="red">
+            <span class="sev-dot"></span>
+            <strong>Inestable</strong>
+            <small>Rojo</small>
+          </button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Especialidad(es) tratante(s)</label>
+        <div class="specialty-grid" id="specialtyGrid"></div>
+      </div>
+    </fieldset>
+
+    <!-- STEP 2 -->
+    <fieldset class="step-panel" data-panel="2">
+      <legend class="sr-only">Estado y soportes</legend>
+
+      <div class="field">
+        <label for="fVitals">Signos vitales / PAM</label>
+        <input type="text" id="fVitals" placeholder="Ej. PA 90/60 · PAM 68 · FC 112 · SatO2 94%" class="mono-input">
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label for="fRespType">Soporte respiratorio</label>
+          <select id="fRespType">
+            <option value="">-- Selecciona --</option>
+            <option>Aire ambiente</option>
+            <option>Cánula nasal</option>
+            <option>Máscara de reservorio</option>
+            <option>Alto flujo (AFO)</option>
+            <option>VMNI / BiPAP</option>
+            <option>VM invasiva</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label for="fRespDetail">Detalle respiratorio</label>
+        <input type="text" id="fRespDetail" placeholder="Ej. FiO2 40%, PEEP 6, modo VC" class="mono-input">
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label for="fHemoType">Soporte hemodinámico</label>
+          <select id="fHemoType">
+            <option value="">-- Selecciona --</option>
+            <option>Ninguno</option>
+            <option>Cristaloides</option>
+            <option>Norepinefrina</option>
+            <option>Vasopresina</option>
+            <option>Dobutamina</option>
+            <option>Múltiples vasoactivos</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label for="fHemoDetail">Detalle vasoactivo</label>
+        <input type="text" id="fHemoDetail" placeholder="Ej. NA 0.3 mcg/kg/min" class="mono-input">
+      </div>
+
+      <div class="field">
+        <label for="fMeds">Medicación crítica activa</label>
+        <textarea id="fMeds" rows="2" placeholder="Ej. Meropenem, heparina infusión, sedación con fentanilo/midazolam"></textarea>
+      </div>
+    </fieldset>
+
+    <!-- STEP 3 -->
+    <fieldset class="step-panel" data-panel="3">
+      <legend class="sr-only">Lista de acciones</legend>
+      <div class="field">
+        <label>Pendientes / acciones para el próximo turno</label>
+        <div class="action-add-row">
+          <input type="text" id="fActionInput" placeholder="Escribe un pendiente y agrégalo">
+          <button type="button" id="btnAddAction" class="btn-add" aria-label="Agregar pendiente">
+            <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6z"/></svg>
+          </button>
+        </div>
+        <ul id="actionList" class="action-list"></ul>
+        <p class="hint" id="actionHint">Aún no hay pendientes agregados</p>
+      </div>
+    </fieldset>
+
+    <!-- STEP 4 -->
+    <fieldset class="step-panel" data-panel="4">
+      <legend class="sr-only">Contingencia</legend>
+      <div class="field">
+        <label for="fContingency">Plan de contingencia — "Si pasa X → hacer Y"</label>
+        <textarea id="fContingency" rows="5" placeholder="Ej. Si PAS &lt; 80 mmHg pese a bolo de cristaloides → iniciar norepinefrina y avisar a UCI.&#10;Si desaturación &lt; 88% → aumentar FiO2 y considerar IOT."></textarea>
+      </div>
+
+      <div class="field">
+        <label for="fDisposition">Destino / traslado tras la ronda (opcional)</label>
+        <select id="fDisposition">
+          <option value="">Sin definir</option>
+        </select>
+      </div>
+    </fieldset>
+
+  </form>
+
+  <footer class="form-footer">
+    <button type="button" class="btn-secondary" id="btnPrevStep" hidden>Atrás</button>
+    <button type="button" class="btn-primary" id="btnNextStep">Siguiente</button>
+    <button type="button" class="btn-primary btn-save" id="btnSave" hidden>Guardar paciente</button>
+  </footer>
+</section>
+
+<!-- ===================== VISTA REPORTE ===================== -->
+<section id="reportView" class="view report-view" hidden>
+  <header class="form-header">
+    <button class="icon-btn" id="btnReportBack" aria-label="Volver">
+      <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20z"/></svg>
+    </button>
+    <h2 id="reportTitle">Reporte</h2>
+    <button class="icon-btn" id="btnReportCopy" aria-label="Copiar reporte">
+      <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M16 1H4a2 2 0 0 0-2 2v14h2V3h12V1zm3 4H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2zm0 16H8V7h11v14z"/></svg>
+    </button>
+  </header>
+  <pre id="reportText" class="report-text mono-input"></pre>
+  <button type="button" class="btn-primary btn-block" id="btnReportEdit">Editar este paciente</button>
+</section>
+
+<!-- ===================== VISTA DE TURNOS ===================== -->
+<section id="shiftView" class="view form-view" hidden>
+  <header class="form-header">
+    <button class="icon-btn" id="btnShiftBack" aria-label="Volver">
+      <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20z"/></svg>
+    </button>
+    <h2>Turnos</h2>
+  </header>
+
+  <div class="form-body">
+    <p class="hint" id="shiftAutoHint"></p>
+
+    <div class="field">
+      <label for="fShiftDate">Fecha del turno que estás diligenciando</label>
+      <input type="date" id="fShiftDate">
+    </div>
+
+    <div class="field">
+      <label>Jornada (según la hora actual)</label>
+      <div class="daynight-select" id="daynightSelect">
+        <button type="button" class="dn-btn dn-day" data-type="dia">
+          <span class="dn-icon">☀️</span>
+          <strong>Día</strong>
+          <small>07:00–18:59</small>
+        </button>
+        <button type="button" class="dn-btn dn-night" data-type="noche">
+          <span class="dn-icon">🌙</span>
+          <strong>Noche</strong>
+          <small>19:00–06:59</small>
+        </button>
+      </div>
+    </div>
+
+    <button type="button" class="btn-primary btn-block" id="btnUseShift">Usar este turno</button>
+
+    <div class="field" id="cloudCodeField" hidden>
+      <label for="fCloudCode">Código de turno compartido (sincronización)</label>
+      <input type="text" id="fCloudCode" class="mono-input" readonly>
+      <p class="hint">Comparte este código o simplemente la misma fecha + jornada con el resto del equipo: quien la use en su dispositivo verá los mismos pacientes en tiempo real.</p>
+    </div>
+
+    <h3 class="section-label">Turnos anteriores</h3>
+    <div id="shiftHistoryList" class="shift-history-list"></div>
+  </div>
+</section>
+
+<!-- ===================== ÁREA DE IMPRESIÓN (PDF) ===================== -->
+<div id="printArea"></div>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
