@@ -82,7 +82,7 @@
 <main id="pendientesView" class="view main-view" hidden>
   <div class="section-intro">
     <h2>Pendientes del turno</h2>
-    <p>Ordenados por gravedad del paciente. Márcalos al cumplirlos; no se borran de la lista.</p>
+    <p>Ordenados por prioridad del pendiente. Márcalos al cumplirlos; no se borran de la lista.</p>
   </div>
   <div id="pendientesGroups"></div>
   <div id="pendientesEmpty" class="empty-state" hidden>
@@ -181,6 +181,24 @@
         </div>
       </div>
 
+      <div class="field-row">
+        <div class="field field-doctype">
+          <label for="fDocType">Documento</label>
+          <select id="fDocType">
+            <option value="">--</option>
+            <option value="CC">CC</option>
+            <option value="TI">TI</option>
+            <option value="RC">RC</option>
+            <option value="CE">CE</option>
+            <option value="PP">PP</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="fDocNumber">Número de documento</label>
+          <input type="text" id="fDocNumber" placeholder="Ej. 1234567890" inputmode="numeric" class="mono-input">
+        </div>
+      </div>
+
       <div class="field">
         <label for="fDx">Diagnóstico principal</label>
         <textarea id="fDx" rows="2" placeholder="Ej. Choque séptico de origen abdominal"></textarea>
@@ -218,8 +236,34 @@
       <legend class="sr-only">Estado y soportes</legend>
 
       <div class="field">
-        <label for="fVitals">Signos vitales / PAM</label>
-        <input type="text" id="fVitals" placeholder="Ej. PA 90/60 · PAM 68 · FC 112 · SatO2 94%" class="mono-input">
+        <label>Signos vitales</label>
+        <div class="vitals-grid">
+          <div class="vital-box">
+            <label for="fTA">TA</label>
+            <input type="text" id="fTA" placeholder="120/80" class="mono-input" inputmode="text">
+          </div>
+          <div class="vital-box">
+            <label for="fTAM">TAM</label>
+            <input type="number" id="fTAM" placeholder="78" class="mono-input" inputmode="numeric">
+          </div>
+          <div class="vital-box">
+            <label for="fFC">FC</label>
+            <input type="number" id="fFC" placeholder="88" class="mono-input" inputmode="numeric">
+          </div>
+          <div class="vital-box">
+            <label for="fFR">FR</label>
+            <input type="number" id="fFR" placeholder="18" class="mono-input" inputmode="numeric">
+          </div>
+          <div class="vital-box">
+            <label for="fSaO2">SaO2</label>
+            <input type="number" id="fSaO2" placeholder="96" class="mono-input" inputmode="numeric">
+          </div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="fVitals">Notas adicionales de signos vitales (opcional)</label>
+        <input type="text" id="fVitals" placeholder="Ej. Temp 38.2°C, tendencia a la baja" class="mono-input">
       </div>
 
       <div class="field-row">
@@ -271,6 +315,19 @@
       <legend class="sr-only">Lista de acciones</legend>
       <div class="field">
         <label>Pendientes / acciones para el próximo turno</label>
+
+        <div class="priority-select" id="prioritySelect">
+          <button type="button" class="prio-btn prio-alta" data-priority="alta">
+            <span class="prio-dot"></span> Alta
+          </button>
+          <button type="button" class="prio-btn prio-media" data-priority="media">
+            <span class="prio-dot"></span> Media
+          </button>
+          <button type="button" class="prio-btn prio-baja" data-priority="baja">
+            <span class="prio-dot"></span> Baja
+          </button>
+        </div>
+
         <div class="action-add-row">
           <input type="text" id="fActionInput" placeholder="Escribe un pendiente y agrégalo">
           <button type="button" id="btnAddAction" class="btn-add" aria-label="Agregar pendiente">

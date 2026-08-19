@@ -11,6 +11,8 @@ const THEME_KEY = 'handoff.theme';
 
 const SEVERITY_LABEL = { green: 'Estable', yellow: 'Watcher', red: 'Inestable' };
 const SEVERITY_ORDER = { red: 0, yellow: 1, green: 2, '': 3 };
+const PRIORITY_LABEL = { alta: 'Alta', media: 'Media', baja: 'Baja' };
+const PRIORITY_ORDER = { alta: 0, media: 1, baja: 2 };
 const SHIFT_TYPE_LABEL = { dia: 'Día', noche: 'Noche' };
 const SHIFT_TYPE_ICON = { dia: '☀️', noche: '🌙' };
 
@@ -29,6 +31,17 @@ const OTHER_SPECIALTIES = [
   { id:'reumatologia', label:'Reumatología' },
   { id:'oncologia', label:'Oncología' },
   { id:'hematologia', label:'Hematología' },
+  { id:'neurologia', label:'Neurología' },
+  { id:'pediatria', label:'Pediatría' },
+  { id:'psiquiatria', label:'Psiquiatría' },
+  { id:'cardiologia', label:'Cardiología' },
+  { id:'dermatologia', label:'Dermatología' },
+  { id:'dolor', label:'Dolor' },
+  { id:'infectologia', label:'Infectología' },
+  { id:'otorrino', label:'Otorrinolaringología' },
+  { id:'oftalmologia', label:'Oftalmología' },
+  { id:'cirugia_plastica', label:'Cirugía Plástica' },
+  { id:'nefrologia', label:'Nefrología' },
 ];
 const ALL_SPECIALTIES = [...MAIN_SPECIALTIES, ...OTHER_SPECIALTIES];
 const SPECIALTY_LABEL = Object.fromEntries(ALL_SPECIALTIES.map(s => [s.id, s.label]));
@@ -36,6 +49,8 @@ const OTHER_SPECIALTY_IDS = OTHER_SPECIALTIES.map(s => s.id);
 
 const DISPOSITIONS = [
   { id:'salida', label:'Salida', icon:'🚪' },
+  { id:'remision', label:'Remisión', icon:'🚑' },
+  { id:'a_definir', label:'A definir', icon:'❓' },
   { id:'observacion', label:'Observación', icon:'🕒' },
   { id:'hospitalizacion', label:'Hospitalización', icon:'🛏️' },
   { id:'uci', label:'UCI', icon:'🫁' },
@@ -53,6 +68,7 @@ let currentSpecialtyTab = MAIN_SPECIALTIES[0].id;
 let editingId = null;
 let currentStep = 1;
 let draftActions = [];
+let draftActionPriority = 'media';
 let draftSeverity = null;
 let draftSpecialties = [];
 let draftShiftType = null;
@@ -149,10 +165,13 @@ function switchOrCreateShift(date, type){
 
 /* =========================================================
    SINCRONIZACIÓN EN LA NUBE (opcional, Firestore)
-   Se activa solo si /firebase-config.js trae credenciales reales.
-   Cada turno (fecha+jornada) es un documento compartido:
-   quien use la misma fecha y jornada ve los mismos pacientes.
+   ⚠️ DESACTIVADA TEMPORALMENTE: mientras no resolvamos que un
+   dispositivo con caché/localStorage antiguo pueda sobrescribir
+   datos más recientes de otro, la dejamos apagada. El código queda
+   intacto para reactivarla más adelante cambiando esta constante a false.
    ========================================================= */
+const CLOUD_SYNC_DISABLED = true;
+
 let cloudEnabled = false;
 let db = null;
 let cloudUnsub = null;
@@ -160,6 +179,7 @@ let cloudSyncTimer = null;
 let applyingRemoteSnapshot = false;
 
 function initCloud(){
+  if (CLOUD_SYNC_DISABLED) return;
   try{
     const cfg = window.FIREBASE_CONFIG;
     if (!cfg || !cfg.apiKey || cfg.apiKey.indexOf('TU_') === 0 || cfg.apiKey === '') return;
@@ -175,6 +195,7 @@ function initCloud(){
 function shiftDocId(shift){ return `${shift.date}_${shift.type}`; }
 
 function attachCloudListener(shift){
+  if (CLOUD_SYNC_DISABLED) return;
   if (!cloudEnabled) return;
   if (cloudUnsub){ cloudUnsub(); cloudUnsub = null; }
   const id = shiftDocId(shift);
@@ -307,10 +328,11 @@ function specialtyTagsHtml(p){
   return `<div class="card-specialties">${p.specialties.map(id => `<span class="spec-tag">${escapeHtml(SPECIALTY_LABEL[id] || id)}</span>`).join('')}</div>`;
 }
 function pendingPreviewHtml(p){
-  const pend = (p.actions || []).filter(a => !a.done);
+  const pend = (p.actions || []).filter(a => !a.done)
+    .sort((a,b) => (PRIORITY_ORDER[a.priority||'media']??1) - (PRIORITY_ORDER[b.priority||'media']??1));
   if (!pend.length) return '';
   const shown = pend.slice(0, 3);
-  let html = `<ul class="card-pending-preview">${shown.map(a => `<li>${escapeHtml(a.text)}</li>`).join('')}</ul>`;
+  let html = `<ul class="card-pending-preview">${shown.map(a => `<li><span class="pi-dot ${a.priority||'media'}"></span>${escapeHtml(a.text)}</li>`).join('')}</ul>`;
   if (pend.length > shown.length) html += `<div class="card-pending-more">+${pend.length - shown.length} pendiente(s) más</div>`;
   return html;
 }
@@ -389,37 +411,42 @@ function renderPendientesBadge(){
   badge.textContent = total > 99 ? '99+' : total;
 }
 function renderPendientes(){
-  const patients = sortBySeverity(getActivePatients());
+  const patients = getActivePatients();
   const wrap = document.getElementById('pendientesGroups');
   const empty = document.getElementById('pendientesEmpty');
   wrap.innerHTML = '';
 
+  // Reunimos todos los pendientes de todos los pacientes, agrupados por
+  // la prioridad propia del pendiente (no por la gravedad del paciente).
+  const flat = [];
+  patients.forEach(p => {
+    (p.actions||[]).forEach((a, idx) => {
+      flat.push({ patientId: p.id, bed: p.bed || '-', idx, text: a.text, done: a.done, priority: a.priority || 'media' });
+    });
+  });
+
   const groups = [
-    { key:'red', title: '🔴 Inestables' },
-    { key:'yellow', title: '🟡 Watcher' },
-    { key:'green', title: '🟢 Estables' },
+    { key:'alta', title: '🔺 Prioridad alta' },
+    { key:'media', title: '➖ Prioridad media' },
+    { key:'baja', title: '🔽 Prioridad baja' },
   ];
   let any = false;
 
   groups.forEach(g => {
-    const patientsInGroup = patients.filter(p => (p.severity||'') === g.key && (p.actions||[]).length);
-    if (!patientsInGroup.length) return;
+    const itemsInGroup = flat.filter(it => it.priority === g.key)
+      .sort((a,b) => a.bed.localeCompare(b.bed, 'es', { numeric:true }));
+    if (!itemsInGroup.length) return;
     any = true;
     const groupEl = document.createElement('div');
     groupEl.className = 'pending-group';
-    let itemsHtml = '';
-    patientsInGroup.forEach(p => {
-      (p.actions||[]).forEach((a, idx) => {
-        itemsHtml += `
-          <div class="pending-item ${a.done?'done':''}" data-patient="${p.id}" data-idx="${idx}">
-            <span class="pi-check"></span>
-            <div class="pi-body">
-              <div class="pi-text">${escapeHtml(a.text)}</div>
-              <div class="pi-meta">Cama ${escapeHtml(p.bed||'-')}</div>
-            </div>
-          </div>`;
-      });
-    });
+    const itemsHtml = itemsInGroup.map(it => `
+      <div class="pending-item ${it.done?'done':''}" data-patient="${it.patientId}" data-idx="${it.idx}">
+        <span class="pi-check"></span>
+        <div class="pi-body">
+          <div class="pi-text">${escapeHtml(it.text)}</div>
+          <div class="pi-meta">Cama ${escapeHtml(it.bed)}</div>
+        </div>
+      </div>`).join('');
     groupEl.innerHTML = `<div class="pending-group-title">${g.title}</div>${itemsHtml}`;
     wrap.appendChild(groupEl);
   });
@@ -539,6 +566,7 @@ function populateDispositionSelect(){
 function openNewPatient(){
   editingId = null;
   draftActions = [];
+  draftActionPriority = 'media';
   draftSeverity = null;
   draftSpecialties = [];
   currentStep = 1;
@@ -546,6 +574,7 @@ function openNewPatient(){
   document.getElementById('btnDelete').hidden = true;
   document.getElementById('patientForm').reset();
   renderActions();
+  setActionPriority('media');
   renderSpecialtyGrid();
   setSeverity(null);
   goToStep(1);
@@ -556,6 +585,7 @@ function openEditPatient(id){
   if (!p) return;
   editingId = id;
   draftActions = JSON.parse(JSON.stringify(p.actions || []));
+  draftActionPriority = 'media';
   draftSeverity = p.severity || null;
   draftSpecialties = [...(p.specialties || [])];
   currentStep = 1;
@@ -566,7 +596,14 @@ function openEditPatient(id){
   document.getElementById('fBed').value = p.bed || '';
   document.getElementById('fAge').value = p.age || '';
   document.getElementById('fSex').value = p.sex || '';
+  document.getElementById('fDocType').value = p.docType || '';
+  document.getElementById('fDocNumber').value = p.docNumber || '';
   document.getElementById('fDx').value = p.diagnosis || '';
+  document.getElementById('fTA').value = p.ta || '';
+  document.getElementById('fTAM').value = p.tam || '';
+  document.getElementById('fFC').value = p.fc || '';
+  document.getElementById('fFR').value = p.fr || '';
+  document.getElementById('fSaO2').value = p.sao2 || '';
   document.getElementById('fVitals').value = p.vitals || '';
   document.getElementById('fRespType').value = p.respType || '';
   document.getElementById('fRespDetail').value = p.respDetail || '';
@@ -577,6 +614,7 @@ function openEditPatient(id){
   document.getElementById('fDisposition').value = p.disposition || '';
 
   renderActions();
+  setActionPriority('media');
   renderSpecialtyGrid();
   setSeverity(draftSeverity);
   goToStep(1);
@@ -620,19 +658,40 @@ document.getElementById('severitySelect').addEventListener('click', (e) => {
   if (btn) setSeverity(btn.dataset.sev);
 });
 
+/* ---------- Selector de prioridad de pendientes ---------- */
+function setActionPriority(p){
+  draftActionPriority = p;
+  document.querySelectorAll('.prio-btn').forEach(b => b.classList.toggle('selected', b.dataset.priority === p));
+}
+document.getElementById('prioritySelect').addEventListener('click', (e) => {
+  const btn = e.target.closest('.prio-btn');
+  if (btn) setActionPriority(btn.dataset.priority);
+});
+
 /* ---------- Lista de acciones dinámica ---------- */
+function cyclePriority(current){
+  const order = ['alta','media','baja'];
+  const i = order.indexOf(current);
+  return order[(i + 1) % order.length];
+}
 function renderActions(){
   const ul = document.getElementById('actionList');
   const hint = document.getElementById('actionHint');
   ul.innerHTML = '';
   hint.hidden = draftActions.length !== 0;
   draftActions.forEach((a, idx) => {
+    const prio = a.priority || 'media';
     const li = document.createElement('li');
     li.className = 'action-item';
-    li.innerHTML = `<span>${escapeHtml(a.text)}</span>
+    li.innerHTML = `<span class="prio-tag ${prio}" data-action="cycle" data-idx="${idx}" title="Toca para cambiar la prioridad">${PRIORITY_LABEL[prio]}</span>
+      <span>${escapeHtml(a.text)}</span>
       <button type="button" aria-label="Eliminar pendiente" data-idx="${idx}">
         <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
       </button>`;
+    li.querySelector('.prio-tag').addEventListener('click', () => {
+      draftActions[idx].priority = cyclePriority(draftActions[idx].priority || 'media');
+      renderActions();
+    });
     li.querySelector('button').addEventListener('click', () => { draftActions.splice(idx, 1); renderActions(); });
     ul.appendChild(li);
   });
@@ -641,7 +700,7 @@ function addActionFromInput(){
   const input = document.getElementById('fActionInput');
   const text = input.value.trim();
   if (!text) return;
-  draftActions.push({ text, done:false });
+  draftActions.push({ text, done:false, priority: draftActionPriority });
   input.value = '';
   renderActions();
   input.focus();
@@ -661,9 +720,16 @@ document.getElementById('btnSave').addEventListener('click', () => {
     bed,
     age: document.getElementById('fAge').value.trim(),
     sex: document.getElementById('fSex').value,
+    docType: document.getElementById('fDocType').value,
+    docNumber: document.getElementById('fDocNumber').value.trim(),
     diagnosis: document.getElementById('fDx').value.trim(),
     severity: draftSeverity,
     specialties: [...draftSpecialties],
+    ta: document.getElementById('fTA').value.trim(),
+    tam: document.getElementById('fTAM').value.trim(),
+    fc: document.getElementById('fFC').value.trim(),
+    fr: document.getElementById('fFR').value.trim(),
+    sao2: document.getElementById('fSaO2').value.trim(),
     vitals: document.getElementById('fVitals').value.trim(),
     respType: document.getElementById('fRespType').value,
     respDetail: document.getElementById('fRespDetail').value.trim(),
@@ -699,23 +765,36 @@ document.getElementById('btnDelete').addEventListener('click', () => {
 });
 
 /* ---------- Reporte individual / texto plano ---------- */
+function formatVitalsLine(p){
+  const parts = [];
+  if (p.ta) parts.push(`TA ${p.ta}`);
+  if (p.tam) parts.push(`TAM ${p.tam}`);
+  if (p.fc) parts.push(`FC ${p.fc}`);
+  if (p.fr) parts.push(`FR ${p.fr}`);
+  if (p.sao2) parts.push(`SaO2 ${p.sao2}%`);
+  return parts.join(' · ');
+}
 function buildPatientReport(p){
   const sevIcon = { green: '🟢', yellow: '🟡', red: '🔴' }[p.severity] || '⚪';
   const specs = (p.specialties||[]).map(id => SPECIALTY_LABEL[id]).filter(Boolean).join(', ');
+  const doc = p.docType && p.docNumber ? `${p.docType} ${p.docNumber}` : (p.docNumber || '');
+  const vitalsLine = formatVitalsLine(p);
   const lines = [];
   lines.push(`${sevIcon} CAMA ${p.bed || '-'}  |  ${p.age ? p.age+' a\u00f1os' : 'edad ND'}  |  ${p.sex || 'sexo ND'}`);
+  if (doc) lines.push(`Doc: ${doc}`);
   lines.push(`Gravedad: ${SEVERITY_LABEL[p.severity] || 'Sin clasificar'}`);
   lines.push(`Especialidad(es): ${specs || '-'}`);
   lines.push(`Dx: ${p.diagnosis || '-'}`);
   lines.push('');
   lines.push('— ESTADO Y SOPORTES —');
-  lines.push(`SV/PAM: ${p.vitals || '-'}`);
+  lines.push(`SV: ${vitalsLine || '-'}`);
+  if (p.vitals) lines.push(`Notas SV: ${p.vitals}`);
   lines.push(`Resp: ${[p.respType, p.respDetail].filter(Boolean).join(' — ') || '-'}`);
   lines.push(`Hemodinámico: ${[p.hemoType, p.hemoDetail].filter(Boolean).join(' — ') || '-'}`);
   lines.push(`Medicación crítica: ${p.meds || '-'}`);
   lines.push('');
   lines.push('— PENDIENTES —');
-  if (p.actions && p.actions.length) p.actions.forEach(a => lines.push(`[${a.done?'x':' '}] ${a.text}`));
+  if (p.actions && p.actions.length) p.actions.forEach(a => lines.push(`[${a.done?'x':' '}] (${PRIORITY_LABEL[a.priority||'media']}) ${a.text}`));
   else lines.push('(sin pendientes)');
   lines.push('');
   lines.push('— CONTINGENCIA —');
@@ -842,12 +921,15 @@ function buildPrintHtml(){
   html += '<h2>Pacientes</h2>';
   patients.forEach(p => {
     const specs = (p.specialties||[]).map(id => SPECIALTY_LABEL[id]).filter(Boolean).join(', ') || '-';
-    const pend = (p.actions||[]).length ? p.actions.map(a => `<li>${a.done?'✔ ':''}${escapeHtml(a.text)}</li>`).join('') : '<li>(sin pendientes)</li>';
+    const doc = p.docType && p.docNumber ? `${p.docType} ${p.docNumber}` : (p.docNumber || '-');
+    const vitalsLine = formatVitalsLine(p) || '-';
+    const pend = (p.actions||[]).length ? p.actions.map(a => `<li>${a.done?'✔ ':''}<b>(${PRIORITY_LABEL[a.priority||'media']})</b> ${escapeHtml(a.text)}</li>`).join('') : '<li>(sin pendientes)</li>';
     html += `<div class="pp-patient pp-sev-${p.severity||'green'}">
       <b>Cama ${escapeHtml(p.bed||'-')} · ${p.age?p.age+' años':'edad ND'} · ${escapeHtml(p.sex||'')}</b> — ${SEVERITY_LABEL[p.severity]||'Sin clasificar'}<br>
+      Doc: ${escapeHtml(doc)}<br>
       Especialidad(es): ${escapeHtml(specs)}<br>
       Dx: ${escapeHtml(p.diagnosis||'-')}<br>
-      SV/PAM: ${escapeHtml(p.vitals||'-')}<br>
+      SV: ${escapeHtml(vitalsLine)}${p.vitals ? ' · '+escapeHtml(p.vitals) : ''}<br>
       Resp: ${escapeHtml([p.respType,p.respDetail].filter(Boolean).join(' — ')||'-')} · Hemodinámico: ${escapeHtml([p.hemoType,p.hemoDetail].filter(Boolean).join(' — ')||'-')}<br>
       Medicación crítica: ${escapeHtml(p.meds||'-')}<br>
       Pendientes: <ul>${pend}</ul>

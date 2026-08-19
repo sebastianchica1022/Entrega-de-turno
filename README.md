@@ -1,6 +1,8 @@
 # Entrega de Turno · I-PASS/SBAR
 
-PWA offline-first para entregas de turno estructuradas en urgencias/UCI. HTML + CSS + JS puro, lista para GitHub Pages, con sincronización opcional entre dispositivos.
+PWA offline-first para entregas de turno estructuradas en urgencias/UCI. HTML + CSS + JS puro, lista para GitHub Pages.
+
+> ⚠️ **Sincronización entre dispositivos: pausada por ahora.** El código de Firebase queda armado en el proyecto pero desactivado con un interruptor (`CLOUD_SYNC_DISABLED = true` en `app.js`), porque detectamos que un dispositivo con caché/almacenamiento local desactualizado puede sobrescribir datos más recientes de otro al conectarse. Hasta que resolvamos ese conflicto de forma segura, cada dispositivo guarda su propia copia local únicamente. Más detalles al final de este documento.
 
 ## Archivos
 
@@ -17,42 +19,26 @@ icons/                      → íconos 192/512/maskable
 ## Qué trae esta versión
 
 - **Turno con fecha y jornada explícitas**: cada turno queda identificado por la fecha que se está diligenciando y si es Día (07:00–18:59) o Noche (19:00–06:59), sugerido automáticamente según la hora del dispositivo. Se ve en la barra superior y en cada reporte/PDF.
-- **Especialidad tratante** (multi-selección por paciente) con pestaña propia: Medicina de Urgencias, Cirugía General, Medicina Interna, Cuidados Paliativos, Neurocirugía, Ginecología, Ortopedia, Medicina General, y una pestaña "Otras" que agrupa Neumología, Reumatología, Oncología y Hematología.
-- **Pestaña de Traslados**: agrupa pacientes por destino (Salida, Observación, Hospitalización, UCI, UCIN, Morgue) para revisar al final de la ronda.
+- **Documento de identidad**: tipo (CC/TI/RC/CE/PP) y número, en la sección de identificación.
+- **Signos vitales en cuadros pequeños**: TA, TAM, FC, FR y SaO2 como campos individuales rápidos de llenar, más un campo de notas adicionales opcional.
+- **Especialidad tratante** (multi-selección por paciente) con pestaña propia: Medicina de Urgencias, Cirugía General, Medicina Interna, Cuidados Paliativos, Neurocirugía, Ginecología, Ortopedia, Medicina General, y una pestaña "Otras" que agrupa Neumología, Reumatología, Oncología, Hematología, Neurología, Pediatría, Psiquiatría, Cardiología, Dermatología, Dolor, Infectología, Otorrinolaringología, Oftalmología, Cirugía Plástica y Nefrología.
+- **Pestaña de Traslados**: agrupa pacientes por destino (Salida, Remisión, A definir, Observación, Hospitalización, UCI, UCIN, Morgue) para revisar al final de la ronda.
 - **Pestaña de Pendientes**: todos los pendientes del turno en una sola lista, ordenados primero los de pacientes inestables (rojo), luego watcher (amarillo), luego estables (verde). Se marcan con un check al cumplirse, pero no se borran — quedan como historial de lo ejecutado.
 - **Tarjetas de paciente** muestran de una vez la(s) especialidad(es) y los primeros pendientes, sin necesidad de entrar al detalle.
 - **PDF resumido**: botón de documento en la barra superior genera una vista de impresión con todos los pacientes, pendientes y traslados; se guarda como PDF usando el diálogo de impresión del navegador/celular ("Guardar como PDF"), sin depender de internet.
-- **Sincronización opcional entre dispositivos** (ver abajo): si la configuras, varios celulares que usen la misma fecha + jornada ven y editan los mismos pacientes casi en tiempo real.
 
-## Cómo funciona el almacenamiento
+## Sobre la sincronización entre dispositivos (pausada)
+
+El proyecto incluye toda la integración con Firebase Firestore lista para funcionar (mismo `firebase-config.js` que ya configuraste con tu proyecto), pero **queda apagada a propósito** mientras resolvemos con cuidado el problema real que detectaste: si un computador tiene la app abierta con datos viejos en su caché o en `localStorage` y en algún momento vuelve a escribir, podría sobrescribir cambios más recientes hechos por otra persona desde otro dispositivo (el sistema actual no tiene forma de saber cuál versión es "más nueva" a nivel de cada paciente individual).
+
+Por ahora, cada dispositivo funciona de forma completamente local e independiente — igual que al principio — y eso es justamente lo más seguro para no perder información.
+
+Cuando quieras retomarlo, la solución correcta implica: (a) sincronizar por paciente individual en vez de por turno completo, para que dos personas editando pacientes distintos no se pisen; (b) usar marcas de tiempo por paciente para resolver conflictos ("gana el cambio más reciente" a nivel de cada paciente, no de todo el turno); y (c) forzar que cada dispositivo revise si hay una versión más nueva del turno antes de mostrar los datos guardados localmente. Es un cambio de diseño más cuidadoso, no una simple activación — lo hacemos cuando quieras retomarlo.
+
+## Cómo funciona el almacenamiento (modo actual)
 
 - **Local**: cada turno se guarda en `localStorage` del dispositivo (clave `handoff.shifts.v2`), así que la app funciona sin internet.
-- **En la nube (opcional)**: si configuras Firebase (gratis), cada turno se guarda también como un documento en Firestore identificado por `fecha_jornada` (ej. `2026-08-17_noche`). Cualquier dispositivo que seleccione esa misma fecha y jornada en "Turnos" queda escuchando los cambios en tiempo real. Sin conexión, el dispositivo sigue funcionando con su copia local y se sincroniza en cuanto recupera internet.
-
-## Activar la sincronización entre dispositivos (opcional, gratis)
-
-Sin este paso, la app funciona perfecto pero cada dispositivo ve solo sus propios datos.
-
-1. Ve a [https://console.firebase.google.com](https://console.firebase.google.com) e inicia sesión con una cuenta Google.
-2. Crea un proyecto nuevo (plan gratuito "Spark", no pide tarjeta).
-3. En el menú lateral: **Compilación → Firestore Database → Crear base de datos** → modo producción → elige una región cercana (ej. `southamerica-east1`).
-4. En la pestaña **Reglas** de Firestore, reemplaza el contenido por:
-   ```
-   rules_version = '2';
-   service cloud.firestore {
-     match /databases/{database}/documents {
-       match /shifts/{shiftId} {
-         allow read, write: if true;
-       }
-     }
-   }
-   ```
-   Esto permite que cualquiera con el enlace de tu app lea/escriba los turnos — suficiente para un equipo pequeño que comparte la URL. Evita registrar nombres completos o documentos de identidad; usa cama/iniciales.
-5. Ícono de engranaje → **Configuración del proyecto** → baja a "Tus apps" → agrega una app **Web** (ícono `</>`) → copia el objeto `firebaseConfig`.
-6. Pega esos valores en `firebase-config.js` (reemplaza los que dicen `TU_...`).
-7. Sube ese archivo actualizado a tu repositorio junto con los demás.
-
-Cuando esté activo, verás un indicador "☁️ Sincronizado" junto a la fecha del turno, y un código de turno compartido en la pantalla de "Turnos" que puedes decirle de palabra al resto del equipo (aunque basta con que todos elijan la misma fecha y jornada).
+- La nube queda con la configuración guardada en `firebase-config.js` por si se retoma más adelante, pero mientras `CLOUD_SYNC_DISABLED` esté en `true` no se usa para nada.
 
 ## Desplegar en GitHub Pages
 

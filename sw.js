@@ -1,6 +1,6 @@
 // Service Worker — Entrega de Turno (offline-first)
 // Sube la versión del cache cada vez que cambies index.html/styles.css/app.js
-const CACHE_NAME = 'handoff-cache-v3';
+const CACHE_NAME = 'handoff-cache-v5';
 
 const CORE_ASSETS = [
   './',
