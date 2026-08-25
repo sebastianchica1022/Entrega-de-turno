@@ -181,24 +181,6 @@
         </div>
       </div>
 
-      <div class="field-row">
-        <div class="field field-doctype">
-          <label for="fDocType">Documento</label>
-          <select id="fDocType">
-            <option value="">--</option>
-            <option value="CC">CC</option>
-            <option value="TI">TI</option>
-            <option value="RC">RC</option>
-            <option value="CE">CE</option>
-            <option value="PP">PP</option>
-          </select>
-        </div>
-        <div class="field">
-          <label for="fDocNumber">Número de documento</label>
-          <input type="text" id="fDocNumber" placeholder="Ej. 1234567890" inputmode="numeric" class="mono-input">
-        </div>
-      </div>
-
       <div class="field">
         <label for="fDx">Diagnóstico principal</label>
         <textarea id="fDx" rows="2" placeholder="Ej. Choque séptico de origen abdominal"></textarea>
@@ -233,80 +215,11 @@
 
     <!-- STEP 2 -->
     <fieldset class="step-panel" data-panel="2">
-      <legend class="sr-only">Estado y soportes</legend>
+      <legend class="sr-only">Estado</legend>
 
       <div class="field">
-        <label>Signos vitales</label>
-        <div class="vitals-grid">
-          <div class="vital-box">
-            <label for="fTA">TA</label>
-            <input type="text" id="fTA" placeholder="120/80" class="mono-input" inputmode="text">
-          </div>
-          <div class="vital-box">
-            <label for="fTAM">TAM</label>
-            <input type="number" id="fTAM" placeholder="78" class="mono-input" inputmode="numeric">
-          </div>
-          <div class="vital-box">
-            <label for="fFC">FC</label>
-            <input type="number" id="fFC" placeholder="88" class="mono-input" inputmode="numeric">
-          </div>
-          <div class="vital-box">
-            <label for="fFR">FR</label>
-            <input type="number" id="fFR" placeholder="18" class="mono-input" inputmode="numeric">
-          </div>
-          <div class="vital-box">
-            <label for="fSaO2">SaO2</label>
-            <input type="number" id="fSaO2" placeholder="96" class="mono-input" inputmode="numeric">
-          </div>
-        </div>
-      </div>
-
-      <div class="field">
-        <label for="fVitals">Notas adicionales de signos vitales (opcional)</label>
-        <input type="text" id="fVitals" placeholder="Ej. Temp 38.2°C, tendencia a la baja" class="mono-input">
-      </div>
-
-      <div class="field-row">
-        <div class="field">
-          <label for="fRespType">Soporte respiratorio</label>
-          <select id="fRespType">
-            <option value="">-- Selecciona --</option>
-            <option>Aire ambiente</option>
-            <option>Cánula nasal</option>
-            <option>Máscara de reservorio</option>
-            <option>Alto flujo (AFO)</option>
-            <option>VMNI / BiPAP</option>
-            <option>VM invasiva</option>
-          </select>
-        </div>
-      </div>
-      <div class="field">
-        <label for="fRespDetail">Detalle respiratorio</label>
-        <input type="text" id="fRespDetail" placeholder="Ej. FiO2 40%, PEEP 6, modo VC" class="mono-input">
-      </div>
-
-      <div class="field-row">
-        <div class="field">
-          <label for="fHemoType">Soporte hemodinámico</label>
-          <select id="fHemoType">
-            <option value="">-- Selecciona --</option>
-            <option>Ninguno</option>
-            <option>Cristaloides</option>
-            <option>Norepinefrina</option>
-            <option>Vasopresina</option>
-            <option>Dobutamina</option>
-            <option>Múltiples vasoactivos</option>
-          </select>
-        </div>
-      </div>
-      <div class="field">
-        <label for="fHemoDetail">Detalle vasoactivo</label>
-        <input type="text" id="fHemoDetail" placeholder="Ej. NA 0.3 mcg/kg/min" class="mono-input">
-      </div>
-
-      <div class="field">
-        <label for="fMeds">Medicación crítica activa</label>
-        <textarea id="fMeds" rows="2" placeholder="Ej. Meropenem, heparina infusión, sedación con fentanilo/midazolam"></textarea>
+        <label for="fMeds">Hallazgos críticos y medicación activa</label>
+        <textarea id="fMeds" rows="8" placeholder="Ej. PA 90/60, taquicárdico, requiere norepinefrina 0.3 mcg/kg/min. VM invasiva FiO2 40% PEEP 6. Meropenem, heparina en infusión, sedación con fentanilo/midazolam."></textarea>
       </div>
     </fieldset>
 

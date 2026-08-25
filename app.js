@@ -42,6 +42,15 @@ const OTHER_SPECIALTIES = [
   { id:'oftalmologia', label:'Oftalmología' },
   { id:'cirugia_plastica', label:'Cirugía Plástica' },
   { id:'nefrologia', label:'Nefrología' },
+  { id:'urologia', label:'Urología' },
+  { id:'cirugia_vascular', label:'Cirugía Vascular' },
+  { id:'trabajo_social', label:'Trabajo Social' },
+  { id:'psicologia', label:'Psicología' },
+  { id:'cirugia_torax', label:'Cirugía de Tórax' },
+  { id:'maxilofacial', label:'Maxilofacial' },
+  { id:'estomatologia', label:'Estomatología' },
+  { id:'fonoaudiologia', label:'Fonoaudiología' },
+  { id:'nutricion', label:'Nutrición' },
 ];
 const ALL_SPECIALTIES = [...MAIN_SPECIALTIES, ...OTHER_SPECIALTIES];
 const SPECIALTY_LABEL = Object.fromEntries(ALL_SPECIALTIES.map(s => [s.id, s.label]));
@@ -596,19 +605,7 @@ function openEditPatient(id){
   document.getElementById('fBed').value = p.bed || '';
   document.getElementById('fAge').value = p.age || '';
   document.getElementById('fSex').value = p.sex || '';
-  document.getElementById('fDocType').value = p.docType || '';
-  document.getElementById('fDocNumber').value = p.docNumber || '';
   document.getElementById('fDx').value = p.diagnosis || '';
-  document.getElementById('fTA').value = p.ta || '';
-  document.getElementById('fTAM').value = p.tam || '';
-  document.getElementById('fFC').value = p.fc || '';
-  document.getElementById('fFR').value = p.fr || '';
-  document.getElementById('fSaO2').value = p.sao2 || '';
-  document.getElementById('fVitals').value = p.vitals || '';
-  document.getElementById('fRespType').value = p.respType || '';
-  document.getElementById('fRespDetail').value = p.respDetail || '';
-  document.getElementById('fHemoType').value = p.hemoType || '';
-  document.getElementById('fHemoDetail').value = p.hemoDetail || '';
   document.getElementById('fMeds').value = p.meds || '';
   document.getElementById('fContingency').value = p.contingency || '';
   document.getElementById('fDisposition').value = p.disposition || '';
@@ -720,21 +717,9 @@ document.getElementById('btnSave').addEventListener('click', () => {
     bed,
     age: document.getElementById('fAge').value.trim(),
     sex: document.getElementById('fSex').value,
-    docType: document.getElementById('fDocType').value,
-    docNumber: document.getElementById('fDocNumber').value.trim(),
     diagnosis: document.getElementById('fDx').value.trim(),
     severity: draftSeverity,
     specialties: [...draftSpecialties],
-    ta: document.getElementById('fTA').value.trim(),
-    tam: document.getElementById('fTAM').value.trim(),
-    fc: document.getElementById('fFC').value.trim(),
-    fr: document.getElementById('fFR').value.trim(),
-    sao2: document.getElementById('fSaO2').value.trim(),
-    vitals: document.getElementById('fVitals').value.trim(),
-    respType: document.getElementById('fRespType').value,
-    respDetail: document.getElementById('fRespDetail').value.trim(),
-    hemoType: document.getElementById('fHemoType').value,
-    hemoDetail: document.getElementById('fHemoDetail').value.trim(),
     meds: document.getElementById('fMeds').value.trim(),
     actions: draftActions,
     contingency: document.getElementById('fContingency').value.trim(),
@@ -765,33 +750,17 @@ document.getElementById('btnDelete').addEventListener('click', () => {
 });
 
 /* ---------- Reporte individual / texto plano ---------- */
-function formatVitalsLine(p){
-  const parts = [];
-  if (p.ta) parts.push(`TA ${p.ta}`);
-  if (p.tam) parts.push(`TAM ${p.tam}`);
-  if (p.fc) parts.push(`FC ${p.fc}`);
-  if (p.fr) parts.push(`FR ${p.fr}`);
-  if (p.sao2) parts.push(`SaO2 ${p.sao2}%`);
-  return parts.join(' · ');
-}
 function buildPatientReport(p){
   const sevIcon = { green: '🟢', yellow: '🟡', red: '🔴' }[p.severity] || '⚪';
   const specs = (p.specialties||[]).map(id => SPECIALTY_LABEL[id]).filter(Boolean).join(', ');
-  const doc = p.docType && p.docNumber ? `${p.docType} ${p.docNumber}` : (p.docNumber || '');
-  const vitalsLine = formatVitalsLine(p);
   const lines = [];
   lines.push(`${sevIcon} CAMA ${p.bed || '-'}  |  ${p.age ? p.age+' a\u00f1os' : 'edad ND'}  |  ${p.sex || 'sexo ND'}`);
-  if (doc) lines.push(`Doc: ${doc}`);
   lines.push(`Gravedad: ${SEVERITY_LABEL[p.severity] || 'Sin clasificar'}`);
   lines.push(`Especialidad(es): ${specs || '-'}`);
   lines.push(`Dx: ${p.diagnosis || '-'}`);
   lines.push('');
-  lines.push('— ESTADO Y SOPORTES —');
-  lines.push(`SV: ${vitalsLine || '-'}`);
-  if (p.vitals) lines.push(`Notas SV: ${p.vitals}`);
-  lines.push(`Resp: ${[p.respType, p.respDetail].filter(Boolean).join(' — ') || '-'}`);
-  lines.push(`Hemodinámico: ${[p.hemoType, p.hemoDetail].filter(Boolean).join(' — ') || '-'}`);
-  lines.push(`Medicación crítica: ${p.meds || '-'}`);
+  lines.push('— HALLAZGOS CRÍTICOS Y MEDICACIÓN ACTIVA —');
+  lines.push(p.meds || '(sin registro)');
   lines.push('');
   lines.push('— PENDIENTES —');
   if (p.actions && p.actions.length) p.actions.forEach(a => lines.push(`[${a.done?'x':' '}] (${PRIORITY_LABEL[a.priority||'media']}) ${a.text}`));
@@ -921,17 +890,12 @@ function buildPrintHtml(){
   html += '<h2>Pacientes</h2>';
   patients.forEach(p => {
     const specs = (p.specialties||[]).map(id => SPECIALTY_LABEL[id]).filter(Boolean).join(', ') || '-';
-    const doc = p.docType && p.docNumber ? `${p.docType} ${p.docNumber}` : (p.docNumber || '-');
-    const vitalsLine = formatVitalsLine(p) || '-';
     const pend = (p.actions||[]).length ? p.actions.map(a => `<li>${a.done?'✔ ':''}<b>(${PRIORITY_LABEL[a.priority||'media']})</b> ${escapeHtml(a.text)}</li>`).join('') : '<li>(sin pendientes)</li>';
     html += `<div class="pp-patient pp-sev-${p.severity||'green'}">
       <b>Cama ${escapeHtml(p.bed||'-')} · ${p.age?p.age+' años':'edad ND'} · ${escapeHtml(p.sex||'')}</b> — ${SEVERITY_LABEL[p.severity]||'Sin clasificar'}<br>
-      Doc: ${escapeHtml(doc)}<br>
       Especialidad(es): ${escapeHtml(specs)}<br>
       Dx: ${escapeHtml(p.diagnosis||'-')}<br>
-      SV: ${escapeHtml(vitalsLine)}${p.vitals ? ' · '+escapeHtml(p.vitals) : ''}<br>
-      Resp: ${escapeHtml([p.respType,p.respDetail].filter(Boolean).join(' — ')||'-')} · Hemodinámico: ${escapeHtml([p.hemoType,p.hemoDetail].filter(Boolean).join(' — ')||'-')}<br>
-      Medicación crítica: ${escapeHtml(p.meds||'-')}<br>
+      Hallazgos críticos y medicación activa: ${escapeHtml(p.meds||'(sin registro)')}<br>
       Pendientes: <ul>${pend}</ul>
       Contingencia: ${escapeHtml(p.contingency||'(sin plan registrado)')}<br>
       Destino: ${p.disposition ? escapeHtml(DISPOSITION_LABEL[p.disposition]) : 'Sin definir'}

@@ -273,19 +273,6 @@ button{ font-family: inherit; }
 .field-row{ display:flex; gap:10px; }
 .field-row .field{ flex:1; }
 .field-sm{ flex: 0 0 84px !important; }
-.field-doctype{ flex: 0 0 96px !important; }
-
-/* Vitals grid — cuadros pequeños */
-.vitals-grid{ display:grid; grid-template-columns: 1.3fr repeat(4,1fr); gap:6px; }
-.vital-box{ display:flex; flex-direction:column; gap:4px; }
-.vital-box label{
-  font-size:10px; font-weight:700; text-align:center; margin:0;
-  color: var(--accent); text-transform:uppercase; letter-spacing:.02em;
-}
-.vital-box input{
-  padding: 8px 4px; text-align:center; font-size:13px; font-weight:600;
-  border-radius: 8px;
-}
 
 label{ display:block; font-size: 12.5px; font-weight:600; color: var(--text-muted); margin-bottom:6px; }
 input, select, textarea{
