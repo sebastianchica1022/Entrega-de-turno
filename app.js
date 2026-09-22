@@ -51,6 +51,9 @@ const OTHER_SPECIALTIES = [
   { id:'estomatologia', label:'Estomatología' },
   { id:'fonoaudiologia', label:'Fonoaudiología' },
   { id:'nutricion', label:'Nutrición' },
+  { id:'cirugia_cardiovascular', label:'Cirugía Cardiovascular' },
+  { id:'radiologia_intervencionista', label:'Radiología Intervencionista' },
+  { id:'hemodinamia', label:'Hemodinamia' },
 ];
 const ALL_SPECIALTIES = [...MAIN_SPECIALTIES, ...OTHER_SPECIALTIES];
 const SPECIALTY_LABEL = Object.fromEntries(ALL_SPECIALTIES.map(s => [s.id, s.label]));
