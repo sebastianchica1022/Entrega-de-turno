@@ -820,6 +820,70 @@ function openShiftView(){
 document.getElementById('btnShift').addEventListener('click', openShiftView);
 document.getElementById('btnShiftBack').addEventListener('click', () => showView(lastMainView));
 
+/* ---------- Importar turno desde JSON ---------- */
+function importShiftData(raw){
+  let data;
+  try{ data = JSON.parse(raw); }catch(e){ showToast('El contenido no es un JSON válido'); return; }
+  if (!data || data.format !== 'entrega-turno' || !Array.isArray(data.patients) ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(data.date || '') || !['dia','noche'].includes(data.type)){
+    showToast('Archivo de turno no reconocido'); return;
+  }
+  const validSpec = new Set(ALL_SPECIALTIES.map(s => s.id));
+  const validDisp = new Set(DISPOSITIONS.map(d => d.id));
+  const str = (v, max) => String(v == null ? '' : v).slice(0, max);
+  const clean = data.patients.slice(0, 100).map(p => ({
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2,7),
+    bed: str(p.bed, 60),
+    age: str(p.age, 10),
+    sex: ['M','F','O'].includes(p.sex) ? p.sex : str(p.sex, 5),
+    diagnosis: str(p.diagnosis, 1000),
+    severity: ['green','yellow','red'].includes(p.severity) ? p.severity : null,
+    specialties: (Array.isArray(p.specialties) ? p.specialties : []).filter(id => validSpec.has(id)),
+    meds: str(p.meds, 4000),
+    actions: (Array.isArray(p.actions) ? p.actions : []).slice(0, 50).map(a => ({
+      text: str(a && a.text, 500),
+      done: !!(a && a.done),
+      priority: ['alta','media','baja'].includes(a && a.priority) ? a.priority : 'media',
+    })).filter(a => a.text),
+    contingency: str(p.contingency, 2000),
+    disposition: validDisp.has(p.disposition) ? p.disposition : '',
+    updatedAt: new Date().toISOString(),
+  })).filter(p => p.bed);
+  if (!clean.length){ showToast('El archivo no trae pacientes'); return; }
+
+  const label = `${formatShiftDate(data.date)} · ${SHIFT_TYPE_LABEL[data.type]}`;
+  const existing = findShiftByDateType(data.date, data.type);
+  const hasData = existing && existing.patients.length;
+  if (hasData && !confirm(`Ya hay ${existing.patients.length} paciente(s) en ${label}.\n\nAceptar = REEMPLAZAR por los ${clean.length} del archivo.\nCancelar = no importar.`)) return;
+  if (!hasData && !confirm(`Importar ${clean.length} pacientes al turno ${label}?`)) return;
+
+  const s = existing || createShiftObject(data.date, data.type);
+  if (!existing) shifts.push(s);
+  s.patients = clean;
+  activeShiftId = s.id;
+  saveActiveShiftId();
+  persistActiveShift();
+  renderShiftBar();
+  render();
+  showView('listView');
+  showToast(`${clean.length} pacientes importados`);
+}
+document.getElementById('btnImportFile').addEventListener('click', () => document.getElementById('importFile').click());
+document.getElementById('importFile').addEventListener('change', (e) => {
+  const f = e.target.files && e.target.files[0];
+  if (!f) return;
+  const r = new FileReader();
+  r.onload = () => importShiftData(String(r.result));
+  r.readAsText(f);
+  e.target.value = '';
+});
+document.getElementById('btnImportText').addEventListener('click', () => {
+  const t = document.getElementById('importText').value.trim();
+  if (!t){ showToast('Pega primero el contenido'); return; }
+  importShiftData(t);
+  document.getElementById('importText').value = '';
+});
+
 function setDayNight(type){
   draftShiftType = type;
   document.querySelectorAll('.dn-btn').forEach(b => b.classList.toggle('selected', b.dataset.type === type));

@@ -327,6 +327,16 @@
 
     <button type="button" class="btn-primary btn-block" id="btnUseShift">Usar este turno</button>
 
+    <h3 class="section-label">Importar turno</h3>
+    <p class="hint">Carga pacientes desde un archivo de turno (.json) o pegando su contenido. Se agregan al turno de la fecha/jornada que indique el archivo.</p>
+    <input type="file" id="importFile" accept=".json,application/json,text/plain" hidden>
+    <button type="button" class="btn-secondary btn-block" id="btnImportFile">Elegir archivo .json</button>
+    <div class="field" style="margin-top:10px">
+      <label for="importText">…o pega aquí el contenido</label>
+      <textarea id="importText" rows="4" class="mono-input" placeholder='{"format":"entrega-turno", ...}'></textarea>
+    </div>
+    <button type="button" class="btn-secondary btn-block" id="btnImportText">Importar texto pegado</button>
+
     <div class="field" id="cloudCodeField" hidden>
       <label for="fCloudCode">Código de turno compartido (sincronización)</label>
       <input type="text" id="fCloudCode" class="mono-input" readonly>

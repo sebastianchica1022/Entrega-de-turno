@@ -27,6 +27,8 @@ icons/                      → íconos 192/512/maskable
 - **Tarjetas de paciente** muestran de una vez la(s) especialidad(es) y los primeros pendientes, sin necesidad de entrar al detalle.
 - **PDF resumido**: botón de documento en la barra superior genera una vista de impresión con todos los pacientes, pendientes y traslados; se guarda como PDF usando el diálogo de impresión del navegador/celular ("Guardar como PDF"), sin depender de internet.
 
+- **Importar turno**: en Turnos, botón para cargar un archivo `.json` (formato `entrega-turno`) o pegar su contenido; crea/reemplaza el turno de la fecha y jornada indicadas.
+
 ## Sobre la sincronización entre dispositivos (pausada)
 
 El proyecto incluye toda la integración con Firebase Firestore lista para funcionar (mismo `firebase-config.js` que ya configuraste con tu proyecto), pero **queda apagada a propósito** mientras resolvemos con cuidado el problema real que detectaste: si un computador tiene la app abierta con datos viejos en su caché o en `localStorage` y en algún momento vuelve a escribir, podría sobrescribir cambios más recientes hechos por otra persona desde otro dispositivo (el sistema actual no tiene forma de saber cuál versión es "más nueva" a nivel de cada paciente individual).
